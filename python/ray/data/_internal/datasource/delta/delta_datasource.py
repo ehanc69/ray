@@ -269,13 +269,20 @@ class DeltaDatasource:
         from ray.data._internal.datasource.delta.delta_cdf import (
             read_delta_cdf_distributed,
         )
+        from ray.data._internal.datasource.delta.utilities import (
+            convert_pyarrow_filter_to_sql,
+        )
+
+        # Convert PyArrow filters to SQL predicate for Delta Lake CDF
+        pyarrow_filters = self.arrow_parquet_args.get("filters")
+        sql_predicate = convert_pyarrow_filter_to_sql(pyarrow_filters)
 
         return read_delta_cdf_distributed(
             path=self.path,
             starting_version=self.starting_version,
             ending_version=self.ending_version,
             columns=self.columns,
-            predicate=self.arrow_parquet_args.get("filters"),
+            predicate=sql_predicate,
             storage_options=self.storage_options,
             override_num_blocks=override_num_blocks,
         )
