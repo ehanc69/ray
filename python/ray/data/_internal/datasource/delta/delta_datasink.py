@@ -15,9 +15,9 @@ import pyarrow as pa
 import pyarrow.fs as pa_fs
 import pyarrow.parquet as pq
 
-from ray.data._internal.datasource.delta.config import DeltaWriteConfig, WriteMode
+from ray.data._internal.datasource.delta.config import WriteMode
 from ray.data._internal.datasource.delta.utilities import (
-    DeltaUtilities,
+    get_storage_options,
     try_get_deltatable,
 )
 from ray.data._internal.execution.interfaces import TaskContext
@@ -65,21 +65,11 @@ class DeltaDatasink(Datasink[List["AddAction"]]):
         self.schema = schema
         self.write_kwargs = write_kwargs
         self._skip_write = False
-        self._written_files: Set[str] = set()  # Track files for cleanup
+        self._written_files: Set[str] = set()
         self._existing_table_at_start: Optional["DeltaTable"] = None
 
-        # Initialize Delta utilities
-        self.delta_utils = DeltaUtilities(
-            self.path, storage_options=write_kwargs.get("storage_options")
-        )
-        self.storage_options = self.delta_utils.storage_options
-
-        # Delta write configuration
-        self.delta_write_config = DeltaWriteConfig(
-            mode=self.mode,
-            partition_cols=self.partition_cols,
-            schema=schema,
-            **write_kwargs,
+        self.storage_options = get_storage_options(
+            self.path, write_kwargs.get("storage_options")
         )
 
         # Set up filesystem with retry support
@@ -596,12 +586,14 @@ class DeltaDatasink(Datasink[List["AddAction"]]):
             add_actions=[],
             mode=self.mode.value,
             partition_by=self.partition_cols or None,
-            name=self.delta_write_config.name,
-            description=self.delta_write_config.description,
-            configuration=self.delta_write_config.configuration,
+            name=self.write_kwargs.get("name"),
+            description=self.write_kwargs.get("description"),
+            configuration=self.write_kwargs.get("configuration"),
             storage_options=self.storage_options,
-            commit_properties=self.delta_write_config.commit_properties,
-            post_commithook_properties=self.delta_write_config.post_commithook_properties,
+            commit_properties=self.write_kwargs.get("commit_properties"),
+            post_commithook_properties=self.write_kwargs.get(
+                "post_commithook_properties"
+            ),
         )
         logger.info(f"Created empty Delta table at {self.path}")
 
@@ -618,12 +610,14 @@ class DeltaDatasink(Datasink[List["AddAction"]]):
             add_actions=file_actions,
             mode=self.mode.value,
             partition_by=self.partition_cols or None,
-            name=self.delta_write_config.name,
-            description=self.delta_write_config.description,
-            configuration=self.delta_write_config.configuration,
+            name=self.write_kwargs.get("name"),
+            description=self.write_kwargs.get("description"),
+            configuration=self.write_kwargs.get("configuration"),
             storage_options=self.storage_options,
-            commit_properties=self.delta_write_config.commit_properties,
-            post_commithook_properties=self.delta_write_config.post_commithook_properties,
+            commit_properties=self.write_kwargs.get("commit_properties"),
+            post_commithook_properties=self.write_kwargs.get(
+                "post_commithook_properties"
+            ),
         )
         logger.info(
             f"Created Delta table at {self.path} with {len(file_actions)} files"
@@ -679,8 +673,10 @@ class DeltaDatasink(Datasink[List["AddAction"]]):
             mode=transaction_mode,
             schema=existing_table.schema(),
             partition_by=self.partition_cols or None,
-            commit_properties=self.delta_write_config.commit_properties,
-            post_commithook_properties=self.delta_write_config.post_commithook_properties,
+            commit_properties=self.write_kwargs.get("commit_properties"),
+            post_commithook_properties=self.write_kwargs.get(
+                "post_commithook_properties"
+            ),
         )
         logger.info(
             f"Committed {len(file_actions)} files to Delta table at {self.path} (mode={transaction_mode})"

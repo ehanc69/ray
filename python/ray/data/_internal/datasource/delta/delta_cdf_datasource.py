@@ -90,7 +90,9 @@ class DeltaCDFDatasource(Datasource):
                 input_files=None,
                 exec_stats=None,
             )
-            read_tasks.append(ReadTask(read_fn, metadata, per_task_row_limit=per_task_row_limit))
+            read_tasks.append(
+                ReadTask(read_fn, metadata, per_task_row_limit=per_task_row_limit)
+            )
 
         return read_tasks
 
@@ -120,11 +122,15 @@ class DeltaCDFDatasource(Datasource):
                         yield pa.Table.from_batches([batch])
 
                 if batch_count == 0:
-                    logger.debug(f"No CDF data in version range {start_ver}-{end_ver}, yielding empty table with schema")
+                    logger.debug(
+                        f"No CDF data in version range {start_ver}-{end_ver}, yielding empty table with schema"
+                    )
                     yield self._create_empty_cdf_table(dt)
 
             except Exception as e:
-                logger.warning(f"Error reading CDF for versions {start_ver}-{end_ver}: {e}. Yielding empty table with schema.")
+                logger.warning(
+                    f"Error reading CDF for versions {start_ver}-{end_ver}: {e}. Yielding empty table with schema."
+                )
                 yield self._create_empty_cdf_table(dt)
 
         return read_cdf_range

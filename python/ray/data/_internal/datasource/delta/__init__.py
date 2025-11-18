@@ -10,11 +10,7 @@ This package provides Delta Lake functionality including:
 """
 
 # Configuration classes
-from .config import (
-    DeltaJSONEncoder,
-    DeltaWriteConfig,
-    WriteMode,
-)
+from .config import WriteMode
 
 # Core datasources and datasink
 from .delta_cdf_datasource import DeltaCDFDatasource
@@ -22,29 +18,16 @@ from .delta_datasink import DeltaDatasink
 from .delta_datasource import DeltaDatasource
 
 # Utilities and table operations
-from .utilities import (
-    AWSUtilities,
-    AzureUtilities,
-    DeltaUtilities,
-    GCPUtilities,
-    try_get_deltatable,
-)
+from .utilities import get_storage_options, try_get_deltatable
 
 __all__ = [
     # Core classes
     "DeltaCDFDatasource",
     "DeltaDatasink",
     "DeltaDatasource",
-    # Configuration classes
-    "DeltaJSONEncoder",
-    "DeltaWriteConfig",
     # Enums
     "WriteMode",
-    # Cloud utilities
-    "AWSUtilities",
-    "AzureUtilities",
-    "DeltaUtilities",
-    "GCPUtilities",
     # Helper utilities
+    "get_storage_options",
     "try_get_deltatable",
 ]

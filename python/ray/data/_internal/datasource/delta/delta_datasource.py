@@ -50,7 +50,9 @@ class DeltaDatasource(Datasource):
         _check_import(self, module="deltalake", package="deltalake")
 
         if not isinstance(path, str):
-            raise ValueError("Only single Delta table path supported (not list of paths)")
+            raise ValueError(
+                "Only single Delta table path supported (not list of paths)"
+            )
 
         self.path = path
         self.version = version
