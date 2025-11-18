@@ -91,25 +91,6 @@ class DeltaDatasource(Datasource):
         self, parallelism: int, per_task_row_limit: Optional[int] = None
     ) -> List[ReadTask]:
         """Get read tasks for Delta table snapshot reads."""
-        return []
-
-    def estimate_inmemory_data_size(self) -> Optional[int]:
-        """Estimate in-memory data size for the Delta table."""
-        return None
-
-    def read_as_dataset(
-        self,
-        *,
-        parallelism: int = -1,
-        ray_remote_args: Optional[Dict[str, Any]] = None,
-        meta_provider: Optional[Any] = None,
-        partition_filter: Optional[Any] = None,
-        shuffle: Optional[str] = None,
-        include_paths: bool = False,
-        concurrency: Optional[int] = None,
-        override_num_blocks: Optional[int] = None,
-    ):
-        """Read Delta table as Ray Dataset."""
         if self.cdf:
             from ray.data._internal.datasource.delta.delta_cdf_datasource import (
                 DeltaCDFDatasource,
@@ -130,55 +111,49 @@ class DeltaDatasource(Datasource):
                 predicate=sql_predicate,
             )
 
-            return cdf_datasource.read_as_dataset(
-                parallelism=parallelism,
-                ray_remote_args=ray_remote_args,
-                concurrency=concurrency,
-                override_num_blocks=override_num_blocks,
-            )
-        else:
-            return self._read_snapshot(
-                parallelism=parallelism,
-                ray_remote_args=ray_remote_args,
-                meta_provider=meta_provider,
-                partition_filter=partition_filter,
-                shuffle=shuffle,
-                include_paths=include_paths,
-                concurrency=concurrency,
-                override_num_blocks=override_num_blocks,
-            )
-
-    def _read_snapshot(
-        self,
-        parallelism: int,
-        ray_remote_args: Optional[Dict[str, Any]],
-        meta_provider: Optional[Any],
-        partition_filter: Optional[Any],
-        shuffle: Optional[str],
-        include_paths: bool,
-        concurrency: Optional[int],
-        override_num_blocks: Optional[int],
-    ):
-        """Read Delta table snapshot using read_parquet."""
-        from ray.data import read_parquet
+            return cdf_datasource.get_read_tasks(parallelism, per_task_row_limit)
 
         file_paths = self.get_file_paths()
-        return read_parquet(
+        if not file_paths:
+            return []
+
+        from ray.data._internal.datasource.parquet_datasource import ParquetDatasource
+
+        parquet_datasource = ParquetDatasource(
             file_paths,
-            filesystem=self.filesystem,
             columns=self.columns,
-            parallelism=parallelism,
-            ray_remote_args=ray_remote_args,
-            meta_provider=meta_provider,
-            partition_filter=partition_filter,
+            filesystem=self.filesystem,
             partitioning=self.partitioning,
-            shuffle=shuffle,
-            include_paths=include_paths,
-            file_extensions=["parquet"],
-            concurrency=concurrency,
-            override_num_blocks=override_num_blocks,
             **self.arrow_parquet_args,
         )
+
+        return parquet_datasource.get_read_tasks(parallelism, per_task_row_limit)
+
+    def estimate_inmemory_data_size(self) -> Optional[int]:
+        """Estimate in-memory data size for the Delta table."""
+        if self.cdf:
+            from ray.data._internal.datasource.delta.delta_cdf_datasource import (
+                DeltaCDFDatasource,
+            )
+            from ray.data._internal.datasource.delta.utilities import (
+                convert_pyarrow_filter_to_sql,
+            )
+
+            pyarrow_filters = self.arrow_parquet_args.get("filters")
+            sql_predicate = convert_pyarrow_filter_to_sql(pyarrow_filters)
+
+            cdf_datasource = DeltaCDFDatasource(
+                path=self.path,
+                starting_version=self.starting_version,
+                ending_version=self.ending_version,
+                storage_options=self.storage_options,
+                columns=self.columns,
+                predicate=sql_predicate,
+            )
+
+            return cdf_datasource.estimate_inmemory_data_size()
+
+        return None
 
     def get_name(self) -> str:
         """Return human-readable name for this datasource."""

@@ -4432,14 +4432,14 @@ def read_delta(
         **arrow_parquet_args,
     )
 
-    # Read dataset using datasource
-    return datasource.read_as_dataset(
+    # Read dataset using standard datasource API
+    return read_datasource(
+        datasource,
         parallelism=parallelism,
+        num_cpus=num_cpus,
+        num_gpus=num_gpus,
+        memory=memory,
         ray_remote_args=ray_remote_args,
-        meta_provider=meta_provider,
-        partition_filter=partition_filter,
-        shuffle=shuffle,
-        include_paths=include_paths,
         concurrency=concurrency,
         override_num_blocks=override_num_blocks,
     )

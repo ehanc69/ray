@@ -165,25 +165,6 @@ class DeltaCDFDatasource(Datasource):
         """Return human-readable name for this datasource."""
         return "DeltaCDF"
 
-    def read_as_dataset(
-        self,
-        *,
-        parallelism: int = -1,
-        ray_remote_args: Optional[Dict[str, Any]] = None,
-        concurrency: Optional[int] = None,
-        override_num_blocks: Optional[int] = None,
-    ):
-        """Read CDF data as Ray Dataset with streaming execution."""
-        from ray.data import read_datasource
-
-        return read_datasource(
-            self,
-            parallelism=parallelism if parallelism != -1 else 200,
-            ray_remote_args=ray_remote_args,
-            concurrency=concurrency,
-            override_num_blocks=override_num_blocks,
-        )
-
     def __repr__(self) -> str:
         """String representation of datasource."""
         return (
