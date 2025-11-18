@@ -24,9 +24,6 @@ class DeltaDatasource(Datasource):
         version: Optional[Union[int, str]] = None,
         storage_options: Optional[Dict[str, str]] = None,
         partition_filters: Optional[List[tuple]] = None,
-        cdf: bool = False,
-        starting_version: int = 0,
-        ending_version: Optional[int] = None,
         filesystem: Optional[Any] = None,
         columns: Optional[List[str]] = None,
         partitioning: Partitioning = Partitioning("hive"),
@@ -39,9 +36,6 @@ class DeltaDatasource(Datasource):
             version: Version to read for time travel (integer or ISO 8601 timestamp).
             storage_options: Cloud storage authentication credentials.
             partition_filters: Delta Lake partition filters as list of tuples.
-            cdf: Enable Change Data Feed mode.
-            starting_version: Starting version for CDF reads.
-            ending_version: Ending version for CDF reads.
             filesystem: PyArrow filesystem for reading files.
             columns: List of column names to read.
             partitioning: Partitioning scheme for reading files.
@@ -58,9 +52,6 @@ class DeltaDatasource(Datasource):
         self.version = version
         self.storage_options = storage_options or {}
         self.partition_filters = partition_filters
-        self.cdf = cdf
-        self.starting_version = starting_version
-        self.ending_version = ending_version
         self.filesystem = filesystem
         self.columns = columns
         self.partitioning = partitioning
@@ -76,7 +67,7 @@ class DeltaDatasource(Datasource):
             dt_kwargs = {}
             if self.storage_options:
                 dt_kwargs["storage_options"] = self.storage_options
-            if self.version is not None and not self.cdf:
+            if self.version is not None:
                 dt_kwargs["version"] = self.version
             self._delta_table = DeltaTable(self.path, **dt_kwargs)
         return self._delta_table
@@ -91,28 +82,6 @@ class DeltaDatasource(Datasource):
         self, parallelism: int, per_task_row_limit: Optional[int] = None
     ) -> List[ReadTask]:
         """Get read tasks for Delta table snapshot reads."""
-        if self.cdf:
-            from ray.data._internal.datasource.delta.delta_cdf_datasource import (
-                DeltaCDFDatasource,
-            )
-            from ray.data._internal.datasource.delta.utilities import (
-                convert_pyarrow_filter_to_sql,
-            )
-
-            pyarrow_filters = self.arrow_parquet_args.get("filters")
-            sql_predicate = convert_pyarrow_filter_to_sql(pyarrow_filters)
-
-            cdf_datasource = DeltaCDFDatasource(
-                path=self.path,
-                starting_version=self.starting_version,
-                ending_version=self.ending_version,
-                storage_options=self.storage_options,
-                columns=self.columns,
-                predicate=sql_predicate,
-            )
-
-            return cdf_datasource.get_read_tasks(parallelism, per_task_row_limit)
-
         file_paths = self.get_file_paths()
         if not file_paths:
             return []
@@ -131,28 +100,6 @@ class DeltaDatasource(Datasource):
 
     def estimate_inmemory_data_size(self) -> Optional[int]:
         """Estimate in-memory data size for the Delta table."""
-        if self.cdf:
-            from ray.data._internal.datasource.delta.delta_cdf_datasource import (
-                DeltaCDFDatasource,
-            )
-            from ray.data._internal.datasource.delta.utilities import (
-                convert_pyarrow_filter_to_sql,
-            )
-
-            pyarrow_filters = self.arrow_parquet_args.get("filters")
-            sql_predicate = convert_pyarrow_filter_to_sql(pyarrow_filters)
-
-            cdf_datasource = DeltaCDFDatasource(
-                path=self.path,
-                starting_version=self.starting_version,
-                ending_version=self.ending_version,
-                storage_options=self.storage_options,
-                columns=self.columns,
-                predicate=sql_predicate,
-            )
-
-            return cdf_datasource.estimate_inmemory_data_size()
-
         return None
 
     def get_name(self) -> str:
@@ -180,6 +127,5 @@ class DeltaDatasource(Datasource):
 
     def __repr__(self) -> str:
         """String representation of datasource."""
-        mode = "CDF" if self.cdf else "snapshot"
         version_info = f", version={self.version}" if self.version else ""
-        return f"DeltaDatasource(path={self.path}, mode={mode}{version_info})"
+        return f"DeltaDatasource(path={self.path}{version_info})"

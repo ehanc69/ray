@@ -4274,9 +4274,6 @@ def read_delta(
     version: Optional[Union[int, str]] = None,
     storage_options: Optional[Dict[str, str]] = None,
     partition_filters: Optional[List[tuple]] = None,
-    cdf: bool = False,
-    starting_version: int = 0,
-    ending_version: Optional[int] = None,
     filesystem: Optional["pyarrow.fs.FileSystem"] = None,
     columns: Optional[List[str]] = None,
     parallelism: int = -1,
@@ -4296,8 +4293,8 @@ def read_delta(
     """Creates a :class:`~ray.data.Dataset` from Delta Lake files.
 
     Supports reading from Unity Catalog tables by directly accessing the underlying
-    S3/cloud storage paths. Provides time travel, partition filtering, Change Data
-    Feed (CDF), and other Delta Lake features.
+    S3/cloud storage paths. Provides time travel, partition filtering, and other
+    Delta Lake features.
 
     Examples:
         Read latest version of Delta table:
@@ -4310,15 +4307,6 @@ def read_delta(
         >>> ds = ray.data.read_delta( # doctest: +SKIP
         ...     "s3://bucket/path/to/delta-table/",
         ...     version=5
-        ... )
-
-        Read Change Data Feed (CDF) for incremental ETL:
-
-        >>> ds = ray.data.read_delta( # doctest: +SKIP
-        ...     "s3://bucket/table",
-        ...     cdf=True,
-        ...     starting_version=10,
-        ...     ending_version=20
         ... )
 
         Read from Unity Catalog managed table (direct S3 path):
@@ -4357,12 +4345,6 @@ def read_delta(
             * ``[("year", "=", "2024")]``
             * ``[("year", "=", "2024"), ("month", "in", ["01", "02"])]``
 
-        cdf: If ``True``, reads Change Data Feed instead of snapshot data.
-            Returns incremental changes between versions with _change_type column.
-        starting_version: Starting version for CDF reads (default: 0).
-            Only used when cdf=True.
-        ending_version: Ending version for CDF reads (default: latest version).
-            Only used when cdf=True.
         filesystem: The PyArrow filesystem
             implementation to read from. These filesystems are specified in the
             `pyarrow docs <https://arrow.apache.org/docs/python/api/\
@@ -4417,15 +4399,12 @@ def read_delta(
     if not isinstance(path, str):
         raise ValueError("Only a single Delta Lake table path is supported.")
 
-    # Create Delta datasource with all parameters
+    # Create Delta datasource
     datasource = DeltaDatasource(
         path=path,
         version=version,
         storage_options=storage_options,
         partition_filters=partition_filters,
-        cdf=cdf,
-        starting_version=starting_version,
-        ending_version=ending_version,
         filesystem=filesystem,
         columns=columns,
         partitioning=partitioning,
