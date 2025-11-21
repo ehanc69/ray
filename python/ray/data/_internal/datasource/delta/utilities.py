@@ -96,7 +96,10 @@ def try_get_deltatable(
 
     try:
         return DeltaTable(table_uri, storage_options=storage_options)
-    except FileNotFoundError:
+    except (FileNotFoundError, OSError, ValueError):
+        # FileNotFoundError: Table doesn't exist
+        # OSError: Permission errors, network errors, etc.
+        # ValueError: Invalid table URI or storage options
         return None
 
 

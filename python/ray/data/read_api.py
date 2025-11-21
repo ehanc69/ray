@@ -4367,6 +4367,13 @@ def read_delta(
         path: A single file path for a Delta Lake table. Multiple tables are not yet
             supported.
         version: The version of the Delta Lake table to read. If not specified, the latest version is read.
+        storage_options: Storage options to pass to the Delta Lake reader. These are
+            typically used for cloud storage authentication (e.g., AWS credentials,
+            region settings). For example: ``{"AWS_REGION": "us-west-2"}``.
+        partition_filters: A list of partition filter tuples. Each tuple should be
+            ``(column_name, operator, value)`` where operator is one of ``"="``, ``"!="``,
+            ``"<"``, ``"<="``, ``">"``, ``">="``, ``"in"``, or ``"not in"``.
+            For example: ``[("year", "=", "2024"), ("month", "=", "01")]``.
         filesystem: The PyArrow filesystem
             implementation to read from. These filesystems are specified in the
             `pyarrow docs <https://arrow.apache.org/docs/python/api/\
