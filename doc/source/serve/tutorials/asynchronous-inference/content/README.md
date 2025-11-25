@@ -177,7 +177,7 @@ Now, below is the deployment consumer code, which will read from the task queue 
 
 **What's a Task Consumer?**
 
-The `@task_consumer` decorator transforms a Ray Serve deployment into a worker that consumes tasks from a queue. Ray Serve automatically scales these workers based on queue depth.
+The `@task_consumer` decorator transforms a Ray Serve deployment into a worker that consumes tasks from a queue.
 
 **What's a Task Handler?**
 
@@ -308,138 +308,72 @@ serve.run(
 )
 ```
 
-## Step 4: Test the Service
+## Step 4: Test the service
 
-Now we will execute the client code, which calls our Ray Serve application to process the PDF, and then polls those task IDs for the result.
-
-### 4.1 Client Code to Test the Service
-
-This is the client code to test the service.
+Let's execute the client code, which calls the Ray Serve application to process PDFs and then polls for results using task IDs. First, define the base URL to query and import the required modules.
 
 
 ```python
-"""
-Example client for testing asynchronous PDF processing.
-
-Demonstrates:
-1. Submitting PDF processing tasks
-2. Polling for task status
-3. Retrieving results when complete
-"""
-
 import time
 from typing import Dict, Any
 
 import requests
 
-
-class AsyncPDFClient:
-    """Client for interacting with the async PDF processing API."""
-
-    def __init__(self, base_url: str = "http://localhost:8000"):
-        """
-        Initialize the client.
-        """
-        self.base_url = base_url.rstrip("/")
-
-    def process_pdf(self, pdf_url: str, max_summary_paragraphs: int = 3) -> str:
-        """
-        Submit a PDF processing task.
-        """
-        response = requests.post(
-            f"{self.base_url}/process",
-            json={
-                "pdf_url": pdf_url,
-                "max_summary_paragraphs": max_summary_paragraphs,
-            },
-        )
-        return response.json()["task_id"]
-
-    def get_task_status(self, task_id: str) -> Dict[str, Any]:
-        """
-        Get the current status of a task.
-        """
-        response = requests.get(f"{self.base_url}/status/{task_id}")
-        response.raise_for_status()
-        return response.json()
-
-    def wait_for_task(
-        self,
-        task_id: str,
-        poll_interval: float = 2.0,
-        timeout: float = 120.0,
-    ) -> Dict[str, Any]:
-        """
-        Wait for a task to complete by polling its status.
-        """
-        start_time = time.time()
-
-        while True:
-            # Check if we've exceeded the timeout
-            if time.time() - start_time > timeout:
-                raise TimeoutError(f"Task {task_id} timed out after {timeout}s")
-
-            # Get current task status
-            status = self.get_task_status(task_id)
-            state = status["status"]
-
-            if state == "SUCCESS":
-                return status
-            elif state == "FAILURE":
-                raise RuntimeError(f"Task failed: {status.get('error')}")
-            elif state in ["PENDING", "STARTED"]:
-                print(f"  Task status: {state}, waiting...")
-                time.sleep(poll_interval)
-            else:
-                print(f"  Unknown status: {state}, waiting...")
-                time.sleep(poll_interval)
+# Base URL of your Ray Serve/FastAPI app
+BASE_URL = "http://localhost:8000".rstrip("/")
 ```
 
-### 4.2 Call the Client to Make Requests to the Serve Application
-
-Now we will create the client and call the Serve application to enqueue the tasks and poll for the results.
+Submit two tasks. The application returns a `task_id` for each request that you can use to poll for results.
 
 
 ```python
-"""Run example PDF processing tasks."""
-client = AsyncPDFClient()
+def process_pdf(pdf_url: str, max_summary_paragraphs: int = 3) -> str:
+    """
+    Submit a PDF processing task and return the task_id.
+    """
+    response = requests.post(
+        f"{BASE_URL}/process",
+        json={
+            "pdf_url": pdf_url,
+            "max_summary_paragraphs": max_summary_paragraphs,
+        },
+    )
+    response.raise_for_status()
+    data = response.json()
+    return data["task_id"]
 
-print("=" * 70, "Asynchronous PDF Processing Example", "=" * 70)
-
-# Example: Process multiple PDFs in parallel
-print("\n" + "=" * 70, "Step 1: Submitting PDF processing tasks", "=" * 70)
 
 pdf_urls = [
     "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     "https://arxiv.org/pdf/1706.03762.pdf",
 ]
 
-# Submit all tasks
 task_ids = []
-for i, url in enumerate(pdf_urls, 1):
-    try:
-        task_id = client.process_pdf(url)
-        task_ids.append((task_id, url))
-        print(f"   ✓ Task {i} submitted: {task_id}")
-    except Exception as e:
-        print(f"   ✗ Task {i} failed to submit: {e}")
 
-# Wait for all tasks to complete
-print("\n" + "=" * 70, "Step 2: Waiting for tasks to complete", "=" * 70)
+for i, url in enumerate(pdf_urls, 1):
+        task_id = process_pdf(url)
+        task_ids.append((task_id, url))
+        print(f"   ✓ Task {i} submitted: {task_id}  ({url})")
+```
+
+Next, poll the Ray Serve application using the `task_id` obtained in the previous step to retrieve the result.
+
+
+```python
+def get_task_status(task_id: str) -> Dict[str, Any]:
+    response = requests.get(f"{BASE_URL}/status/{task_id}")
+    response.raise_for_status()
+    return response.json()
 
 for i, (task_id, url) in enumerate(task_ids, 1):
-    print(f"\nTask {i} ({url.split('/')[-1]}):")
-    try:
-        result = client.wait_for_task(task_id, timeout=60.0)
-        if result["result"]:
-            res = result["result"]
-            print(f"   ✓ Complete: {res['page_count']} pages, {res['word_count']} words")
-            print(f"   ✓ Processing time: {res['processing_time_seconds']}s")
-    except Exception as e:
-        print(f"   ✗ Error: {e}")
-
-print("\n" + "=" * 70, "Example complete!", "=" * 70)
-
+        print(f"\nTask {i} ({url.split('/')[-1]}):")
+        result = get_task_status(task_id)
+        res = result.get("result")
+        if res:
+            print(f"   ✓ Complete: {res.get('page_count')} pages, {res.get('word_count')} words")
+            print(f"   ✓ Processing time: {res.get('processing_time_seconds')}s")
+        else:
+            print("   ✗ No result payload found in response.")
 ```
 
 ## Deploy to Anyscale
