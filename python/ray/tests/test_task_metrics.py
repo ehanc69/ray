@@ -110,12 +110,18 @@ import time
 ray.init("auto")
 
 @ray.remote(num_cpus=0)
-def f():
+def fun_to_test():
     time.sleep(999)
-a = [f.remote() for _ in range(1)]
+a = [fun_to_test.remote() for _ in range(1)]
 ray.get(a)
 """
-    procs = [run_string_as_driver_nonblocking(driver) for _ in range(3)]
+    # We make sure the task name is unique for each job so that we can distinguish the metric sample by task name across jobs.
+    procs = [
+        run_string_as_driver_nonblocking(
+            driver.replace("fun_to_test", f"fun_to_test_{i}")
+        )
+        for i in range(3)
+    ]
 
     expected = {
         "RUNNING": 3.0,
@@ -583,17 +589,18 @@ import time
 ray.init("auto")
 
 @ray.remote
-def f():
+def fun_to_test():
     pass
-a = [f.remote() for _ in range(10)]
+a = [fun_to_test.remote() for _ in range(10)]
 ray.get(a)
 """
 
     # If force export at process death is broken, we won't see the recently completed
-    # tasks from the drivers.
+    # tasks from the drivers. We also make sure the task name is unique for each job so
+    # that we can distinguish the metric sample by task name across jobs.
     for i in range(10):
         print("Run job", i)
-        run_string_as_driver(driver)
+        run_string_as_driver(driver.replace("fun_to_test", f"fun_to_test_{i}"))
         tasks_by_state(info, timeseries)
 
     expected = {
